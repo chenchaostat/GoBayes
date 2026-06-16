@@ -1,0 +1,621 @@
+GoBayes
+================
+
+# GoBayes
+
+GoBayes is a lightweight client-side R package for running Bayesian
+Go/No-Go operating characteristic analyses through a remote GoBayes API
+server.
+
+The package is designed for workflows where the computational engine is
+deployed separately, for example on a local server, an internal
+institutional server, or a cloud container service. The R package
+focuses on user-facing configuration, request submission,
+authentication, result conversion, and formatted output.
+
+## Features
+
+GoBayes provides:
+
+- client-side configuration for a remote GoBayes API server
+- Bayesian Go/No-Go operating characteristic calculation
+- comparison of five computational methods
+
+## Architecture
+
+GoBayes follows a client-server design.
+
+The R package does not perform the core Bayesian computation locally.
+Instead, it sends a JSON request to a GoBayes API server and receives a
+structured JSON response.
+
+A typical workflow is:
+
+1.  Start or access a running GoBayes API server.
+2.  Install and load the GoBayes R package.
+3.  Configure the server URL.
+4.  Configure an API token if the server requires authentication.
+5.  Run a Bayesian Go/No-Go operating characteristic analysis.
+6.  Review the formatted output or extract the returned data frame.
+
+## Installation
+
+### Install From a Local Source Directory
+
+If you have the GoBayes package source code locally, install it with:
+
+``` r
+# install.packages("remotes")
+remotes::install_local("GoBayes")
+```
+
+If your working directory is already the package root, you can use:
+
+``` r
+remotes::install_local(".")
+```
+
+### Load the Package
+
+``` r
+library(GoBayes)
+```
+
+## Server Configuration
+
+Before running any analysis, configure the GoBayes API server URL.
+
+``` r
+gobayes_set_server("https://your-gobayes-server.example.com")
+```
+
+### Configure Request Timeout
+
+By default, the request timeout is 120 seconds. For larger simulations
+or exact calculations, you may want to increase it:
+
+``` r
+gobayes_set_server(
+  url = "http://127.0.0.1:8000",
+  timeout = 300
+)
+```
+
+### Check Current Server
+
+To display the configured server URL in masked form:
+
+``` r
+gobayes_get_server()
+```
+
+To display the full configured server URL:
+
+``` r
+gobayes_get_server(masked = FALSE)
+```
+
+## Authentication
+
+If the GoBayes API server requires bearer-token authentication,
+configure the token before making requests:
+
+``` r
+gobayes_set_api_token("Contact the author to get API token")
+```
+
+## Health Check
+
+After configuring the server, verify that the API is reachable:
+
+``` r
+gobayes_health_check()
+```
+
+A successful health check confirms that:
+
+- the server URL is configured
+- the server is reachable from the current R session
+- authentication is valid if required
+- the `/health` endpoint responds successfully
+
+If the health check fails, verify the server URL, network connection,
+port, firewall rules, and API token.
+
+## Bayesian Go/No-Go Operating Characteristic Analysis
+
+The main user-facing function is:
+
+``` r
+gobayes_bayesian_go_nogo_oc()
+```
+
+It computes Bayesian Go/No-Go operating characteristics for one or more
+control and treatment response-rate scenarios.
+
+The function sends the requested design parameters to the GoBayes API
+server and returns an object of class `GoBayesOC`.
+
+## Basic Example
+
+``` r
+library(GoBayes)
+
+gobayes_set_server("http://127.0.0.1:8000")
+gobayes_health_check()
+
+res <- gobayes_bayesian_go_nogo_oc(
+  n_total = 100,
+  alloc_ratio = c(1, 1),
+  delta = 0.05,
+  go_prob = 0.70,
+  nogo_prob = 0.30,
+  control_rates = 0.30,
+  treatment_rates = c(0.30, 0.35, 0.40),
+  n_sim = 10000,
+  run_exact = TRUE,
+  run_mc = TRUE
+)
+
+print(res)
+```
+
+## Clinical Design Example
+
+The following example uses unequal randomization, separate Go and No-Go
+deltas, and a fixed control rate for deriving the Method 5 continuous
+boundary.
+
+``` r
+res <- gobayes_bayesian_go_nogo_oc(
+  n_total = 75,
+  alloc_ratio = c(2, 1),
+  delta = 0.15,
+  go_delta = 0.15,
+  nogo_delta = 0.25,
+  go_prob = 0.80,
+  nogo_prob = 0.10,
+  prior_t = c(1, 1),
+  prior_c = c(1, 1),
+  control_rates = 0.15,
+  treatment_rates = c(0.15, 0.25, 0.35, 0.40, 0.45, 0.50, 0.55),
+  n_sim = 10000,
+  mc_seed = 42,
+  run_exact = TRUE,
+  run_mc = TRUE,
+  method5_pc_hat_boundary = 0.15,
+  integration_tol = 1e-10
+)
+
+print(res)
+```
+
+## Function Arguments
+
+### Sample Size and Allocation
+
+- `n_total`: total sample size across treatment and control arms.
+- `alloc_ratio`: numeric vector of length 2 specifying treatment/control
+  allocation ratio. For example, `c(1, 1)` gives equal allocation, while
+  `c(2, 1)` gives twice as many patients in the treatment arm as in the
+  control arm.
+
+The server derives treatment and control sample sizes from `n_total` and
+`alloc_ratio`.
+
+### Decision Thresholds
+
+- `delta`: default treatment-control difference threshold.
+- `go_delta`: threshold used for the Go decision. If `NULL`, `delta` is
+  used.
+- `nogo_delta`: threshold used for the No-Go decision. If `NULL`,
+  `delta` is used.
+- `go_prob`: posterior probability cutoff for declaring Go.
+- `nogo_prob`: posterior probability cutoff for declaring No-Go.
+
+Conceptually, the Go decision is based on whether the posterior
+probability of the treatment-control difference exceeding the Go
+threshold is sufficiently high.
+
+The No-Go decision is based on whether the posterior probability is
+sufficiently low relative to the No-Go threshold.
+
+### Prior Distributions
+
+- `prior_t`: Beta prior parameters for the treatment arm, supplied as
+  `c(alpha, beta)`.
+- `prior_c`: Beta prior parameters for the control arm, supplied as
+  `c(alpha, beta)`.
+
+For example:
+
+``` r
+prior_t = c(1, 1)
+prior_c = c(1, 1)
+```
+
+uses independent uniform Beta priors for the treatment and control
+response rates.
+
+### Scenario Grid
+
+- `control_rates`: one or more assumed true control response rates.
+- `treatment_rates`: one or more assumed true treatment response rates.
+
+The server evaluates all combinations of `control_rates` and
+`treatment_rates`.
+
+For example:
+
+``` r
+control_rates = c(0.20, 0.30)
+treatment_rates = c(0.30, 0.40, 0.50)
+```
+
+creates six operating-characteristic scenarios.
+
+### Simulation Settings
+
+- `n_sim`: number of Monte Carlo simulations used by Method 3.
+- `mc_seed`: random seed used by Method 3.
+- `run_exact`: whether to run Method 1 exact enumeration.
+- `run_mc`: whether to run Method 3 Monte Carlo simulation.
+- `integration_tol`: numerical tolerance used for posterior probability
+  integration.
+
+For large sample sizes or large scenario grids, exact enumeration and
+Monte Carlo simulation may increase runtime. You can disable them when
+needed:
+
+``` r
+res <- gobayes_bayesian_go_nogo_oc(
+  n_total = 200,
+  control_rates = 0.30,
+  treatment_rates = seq(0.30, 0.60, by = 0.05),
+  run_exact = FALSE,
+  run_mc = FALSE
+)
+```
+
+### Method 5 Boundary Setting
+
+- `method5_pc_hat_boundary`: control response rate used to derive the
+  continuous Bayesian boundary for Method 5.
+
+If `NULL`, each scenario’s true control rate is used.
+
+For designs where the boundary should be derived at a fixed planning
+control rate, specify it explicitly:
+
+``` r
+method5_pc_hat_boundary = 0.15
+```
+
+## Computational Methods
+
+The output compares five methods.
+
+### Method 1: Exact Enumeration
+
+Method 1 enumerates all possible treatment and control responder counts.
+It computes posterior probabilities exactly through numerical
+integration and aggregates Go, Pending, and No-Go probabilities over the
+binomial sampling distribution.
+
+This method is generally the most direct but can be slower for larger
+sample sizes.
+
+### Method 2: Integer Boundary
+
+Method 2 derives integer decision boundaries conditional on each
+possible number of control responders. It then uses binomial tail
+probabilities to compute operating characteristics more efficiently.
+
+This method is usually much faster than full exact enumeration while
+preserving the same decision rule structure.
+
+### Method 3: Monte Carlo
+
+Method 3 simulates trial outcomes under each assumed true response-rate
+scenario. For each simulated trial, it applies the Bayesian Go/No-Go
+decision rule.
+
+Results may vary slightly with `n_sim` and `mc_seed`.
+
+### Method 4: Normal Approximation
+
+Method 4 approximates the posterior difference between treatment and
+control response rates using a normal approximation.
+
+This method is computationally efficient and useful for quick screening,
+but it may be less accurate in small samples or near boundary cases.
+
+### Method 5: Continuous Boundary Plus Normal Approximation
+
+Method 5 derives continuous Bayesian boundaries and applies a normal
+approximation to the observed response-rate difference.
+
+The output includes the derived Go and No-Go boundaries in percentage
+points.
+
+## Returned Object
+
+The result is an object of class `GoBayesOC`.
+
+``` r
+class(res)
+```
+
+The main components are:
+
+- `result`: data frame containing operating-characteristic results.
+- `meta`: metadata returned by the server, including row count and
+  generation time.
+- `input_raw`: list of input parameters sent to the server.
+- `digits`: number of digits used for printing.
+
+You can extract the result table directly:
+
+``` r
+oc_table <- res$result
+head(oc_table)
+```
+
+You can inspect the input parameters:
+
+``` r
+res$input_raw
+```
+
+You can inspect server-side metadata:
+
+``` r
+res$meta
+```
+
+## Output Columns
+
+The `result` data frame includes scenario descriptors:
+
+- `control_orr`: assumed true control response rate
+- `treatment_orr`: assumed true treatment response rate
+- `orr_diff`: treatment-control response-rate difference
+
+It also includes Go, Pending, and No-Go probabilities for each method:
+
+- `Go_Method1_Exact`
+- `Go_Method2_Boundary`
+- `Go_Method3_MC`
+- `Go_Method4_Normal`
+- `Go_Method5_ContBdryNorm`
+- `Pend_Method1_Exact`
+- `Pend_Method2_Boundary`
+- `Pend_Method3_MC`
+- `Pend_Method4_Normal`
+- `Pend_Method5_ContBdryNorm`
+- `NoGo_Method1_Exact`
+- `NoGo_Method2_Boundary`
+- `NoGo_Method3_MC`
+- `NoGo_Method4_Normal`
+- `NoGo_Method5_ContBdryNorm`
+
+Method 5 boundary columns are also returned:
+
+- `Method5_GoBoundary_percent`
+- `Method5_NoGoBoundary_percent`
+- `Method5_pc_hat_boundary`
+
+Runtime columns are included for performance review:
+
+- `time_Method1_Exact`
+- `time_Method2_Boundary`
+- `time_Method3_MC`
+- `time_Method4_Normal`
+- `time_Method5_ContBdryNorm`
+
+## Printing Results
+
+Use the standard `print()` method:
+
+``` r
+print(res)
+```
+
+The printed output displays:
+
+- Go probability table for each method
+- Pending probability table for each method
+- No-Go probability table for each method
+- Method 5 continuous boundaries
+- average runtime per scenario
+- explanatory notes for each method
+
+To change the number of displayed digits:
+
+``` r
+print(res, digits = 2)
+```
+
+You can also set `digits` when calling the analysis function:
+
+``` r
+res <- gobayes_bayesian_go_nogo_oc(
+  n_total = 100,
+  control_rates = 0.30,
+  treatment_rates = c(0.30, 0.35, 0.40),
+  digits = 2
+)
+```
+
+## Recommended Workflow
+
+A typical workflow is:
+
+``` r
+library(GoBayes)
+
+gobayes_set_server("http://127.0.0.1:8000", timeout = 300)
+gobayes_health_check()
+
+res <- gobayes_bayesian_go_nogo_oc(
+  n_total = 100,
+  alloc_ratio = c(1, 1),
+  go_delta = 0.05,
+  nogo_delta = 0.05,
+  go_prob = 0.70,
+  nogo_prob = 0.30,
+  prior_t = c(1, 1),
+  prior_c = c(1, 1),
+  control_rates = c(0.20, 0.30),
+  treatment_rates = c(0.25, 0.30, 0.35, 0.40, 0.45),
+  n_sim = 20000,
+  mc_seed = 2024,
+  run_exact = TRUE,
+  run_mc = TRUE
+)
+
+print(res)
+
+oc_table <- res$result
+```
+
+## Performance Considerations
+
+Runtime depends on:
+
+- total sample size
+- number of control-rate scenarios
+- number of treatment-rate scenarios
+- whether exact enumeration is enabled
+- whether Monte Carlo simulation is enabled
+- number of Monte Carlo simulations
+- numerical integration tolerance
+- server CPU and memory resources
+
+For exploratory analyses, consider using:
+
+``` r
+run_exact = FALSE
+run_mc = FALSE
+```
+
+or a smaller `n_sim`.
+
+For final analyses, consider enabling exact and Monte Carlo methods with
+a sufficiently large `n_sim`, depending on the precision required.
+
+## Troubleshooting
+
+### Server Is Not Configured
+
+If you see an error indicating that the server is not configured, call:
+
+``` r
+gobayes_set_server("http://127.0.0.1:8000")
+```
+
+or set:
+
+``` r
+Sys.setenv(GOBAYES_SERVER_URL = "http://127.0.0.1:8000")
+```
+
+### Cannot Reach Server
+
+If the health check fails:
+
+``` r
+gobayes_health_check()
+```
+
+verify that:
+
+- the server process is running
+- the server URL and port are correct
+- the network connection is available
+- firewall or proxy settings allow the request
+- the server is listening on the expected host and port
+
+### Authentication Error
+
+If the server requires a bearer token, configure it with:
+
+``` r
+gobayes_set_api_token("your-token")
+```
+
+or set:
+
+``` r
+Sys.setenv(GOBAYES_API_TOKEN = "your-token")
+```
+
+### Request Timeout
+
+For long-running analyses, increase the timeout:
+
+``` r
+gobayes_set_server("http://127.0.0.1:8000", timeout = 600)
+```
+
+You can also reduce runtime by setting:
+
+``` r
+run_exact = FALSE
+run_mc = FALSE
+```
+
+or by lowering `n_sim`.
+
+### Invalid Parameter Values
+
+The client performs basic validation before sending requests to the
+server. Common issues include:
+
+- `n_total` must be positive
+- `alloc_ratio` must be a positive numeric vector of length 2
+- response rates must be between 0 and 1
+- probability cutoffs must be between 0 and 1
+- priors must be positive Beta parameters
+
+## Reproducibility
+
+For reproducible Monte Carlo results, set `mc_seed` explicitly:
+
+``` r
+res <- gobayes_bayesian_go_nogo_oc(
+  n_total = 100,
+  control_rates = 0.30,
+  treatment_rates = c(0.30, 0.35, 0.40),
+  n_sim = 50000,
+  mc_seed = 12345
+)
+```
+
+For reproducible server configuration, use environment variables or an
+`.Renviron` file.
+
+## Notes
+
+- GoBayes is intended to support Bayesian Go/No-Go operating
+  characteristic calculations.
+- The client package requires a reachable GoBayes API server.
+- Numerical results depend on the server implementation, input
+  assumptions, integration tolerance, and simulation settings.
+- Method 3 Monte Carlo results may vary unless the same `mc_seed` and
+  `n_sim` are used.
+
+## Citation
+
+If you use `GoBayes` in your work, please cite this repository or the
+corresponding package version.
+
+## License
+
+Please see the `LICENSE` file for details.
+
+## Contact
+
+For issues, feature requests, or bug reports, please open an issue on
+GitHub: <https://github.com/chenchaostat/GoBayes/issues>. You can also
+contact me via email at <chenchaostat@163.com>.

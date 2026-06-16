@@ -1,0 +1,26 @@
+Package: GoBayes
+Title: Bayesian Go/No-Go Operating Characteristic Calculations
+Version: 0.1.0
+Authors@R: 
+    person("GoBayes", "Chen Chao", , "chenchaostat@163.com", role = c("aut", "cre"))
+Description: A lightweight client package for Bayesian Go/No-Go operating 
+    characteristic calculations. Core computations are executed on a remote 
+    GoBayes API server, while the R package provides user-facing functions, 
+    API configuration, result formatting, and printing methods.
+License: MIT + file LICENSE
+URL: https://github.com/chenchaostat/GoBayes
+BugReports: https://github.com/chenchaostat/GoBayes/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends:
+    R (>= 4.1.0)
+Imports:
+    httr2 (>= 1.0.0),
+    cli (>= 3.0.0)
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0
