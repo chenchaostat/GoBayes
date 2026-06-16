@@ -62,7 +62,7 @@ library(GoBayes)
 Before running any analysis, configure the GoBayes API server URL.
 
 ``` r
-gobayes_set_server("Contact the author to get server address")
+gobayes_set_server("http://116.62.190.134:10002")
 ```
 
 ### Configure Request Timeout
@@ -71,7 +71,7 @@ By default, the request timeout is 120 seconds. For larger simulations or exact 
 
 ``` r
 gobayes_set_server(
-  url = "Contact the author to get server address",
+  url = "http://116.62.190.134:10002",
   timeout = 300
 )
 ```
@@ -132,7 +132,7 @@ The function sends the requested design parameters to the GoBayes API server and
 ``` r
 library(GoBayes)
 
-gobayes_set_server("Contact the author to get server address")
+gobayes_set_server("http://116.62.190.134:10002")
 gobayes_set_api_token("Contact the author to get API token")
 gobayes_health_check()
 
@@ -412,7 +412,7 @@ A typical workflow is:
 ``` r
 library(GoBayes)
 
-gobayes_set_server("Contact the author to get server address")
+gobayes_set_server("http://116.62.190.134:10002")
 gobayes_set_api_token("Contact the author to get API token")
 gobayes_health_check()
 
@@ -501,7 +501,7 @@ gobayes_set_api_token("Contact the author to get API token")
 For long-running analyses, increase the timeout:
 
 ``` r
-gobayes_set_server("Contact the author to get server address", timeout = 600)
+gobayes_set_server("http://116.62.190.134:10002", timeout = 600)
 ```
 
 You can also reduce runtime by setting:

@@ -3,15 +3,26 @@ GoBayes
 
 # GoBayes
 
+## Disclaimer
+
+GoBayes is provided for research and educational purposes only. It is
+not intended to provide medical advice, clinical recommendations,
+regulatory guidance, or commercial decision-making support.
+
+Users are responsible for independently validating all simulation
+assumptions, model outputs, and statistical conclusions before using
+them in any scientific, regulatory, or business context.
+
+## Overview
+
 GoBayes is a lightweight client-side R package for running Bayesian
 Go/No-Go operating characteristic analyses through a remote GoBayes API
 server.
 
 The package is designed for workflows where the computational engine is
-deployed separately, for example on a local server, an internal
-institutional server, or a cloud container service. The R package
-focuses on user-facing configuration, request submission,
-authentication, result conversion, and formatted output.
+deployed separately. The R package focuses on user-facing configuration,
+request submission, authentication, result conversion, and formatted
+output.
 
 ## Features
 
@@ -40,19 +51,11 @@ A typical workflow is:
 
 ## Installation
 
-### Install From a Local Source Directory
-
-If you have the GoBayes package source code locally, install it with:
+### Install From Github
 
 ``` r
 # install.packages("remotes")
-remotes::install_local("GoBayes")
-```
-
-If your working directory is already the package root, you can use:
-
-``` r
-remotes::install_local(".")
+remotes::install_github("chenchaostat/GoBayes")
 ```
 
 ### Load the Package
@@ -66,7 +69,7 @@ library(GoBayes)
 Before running any analysis, configure the GoBayes API server URL.
 
 ``` r
-gobayes_set_server("https://your-gobayes-server.example.com")
+gobayes_set_server("http://116.62.190.134:10002")
 ```
 
 ### Configure Request Timeout
@@ -76,7 +79,7 @@ or exact calculations, you may want to increase it:
 
 ``` r
 gobayes_set_server(
-  url = "http://127.0.0.1:8000",
+  url = "http://116.62.190.134:10002",
   timeout = 300
 )
 ```
@@ -127,7 +130,7 @@ port, firewall rules, and API token.
 The main user-facing function is:
 
 ``` r
-gobayes_bayesian_go_nogo_oc()
+gobayes_oc()
 ```
 
 It computes Bayesian Go/No-Go operating characteristics for one or more
@@ -141,13 +144,16 @@ server and returns an object of class `GoBayesOC`.
 ``` r
 library(GoBayes)
 
-gobayes_set_server("http://127.0.0.1:8000")
+gobayes_set_server("http://116.62.190.134:10002")
+gobayes_set_api_token("Contact the author to get API token")
 gobayes_health_check()
 
-res <- gobayes_bayesian_go_nogo_oc(
+res <- gobayes_oc(
   n_total = 100,
   alloc_ratio = c(1, 1),
   delta = 0.05,
+  go_delta = NULL,
+  nogo_delta = NULL,
   go_prob = 0.70,
   nogo_prob = 0.30,
   control_rates = 0.30,
@@ -156,7 +162,6 @@ res <- gobayes_bayesian_go_nogo_oc(
   run_exact = TRUE,
   run_mc = TRUE
 )
-
 print(res)
 ```
 
@@ -167,26 +172,25 @@ deltas, and a fixed control rate for deriving the Method 5 continuous
 boundary.
 
 ``` r
-res <- gobayes_bayesian_go_nogo_oc(
-  n_total = 75,
-  alloc_ratio = c(2, 1),
-  delta = 0.15,
-  go_delta = 0.15,
-  nogo_delta = 0.25,
-  go_prob = 0.80,
-  nogo_prob = 0.10,
-  prior_t = c(1, 1),
-  prior_c = c(1, 1),
-  control_rates = 0.15,
-  treatment_rates = c(0.15, 0.25, 0.35, 0.40, 0.45, 0.50, 0.55),
-  n_sim = 10000,
-  mc_seed = 42,
-  run_exact = TRUE,
-  run_mc = TRUE,
-  method5_pc_hat_boundary = 0.15,
-  integration_tol = 1e-10
+res <- gobayes_oc(
+    n_total = 75,
+    alloc_ratio = c(2, 1),
+    go_delta = 0.15,
+    nogo_delta = 0.25,
+    go_prob = 0.80,
+    nogo_prob = 0.10,
+    prior_t = c(1, 1),
+    prior_c = c(1, 1),
+    control_rates = 0.15,
+    treatment_rates = c(0.15, 0.25, 0.35, 0.40, 0.45, 0.50, 0.55),
+    n_sim = 10000,
+    mc_seed = 2026,
+    run_exact = TRUE,
+    run_mc = TRUE,
+    method5_pc_hat_boundary = 0.15,
+    integration_tol = 1e-10,
+    digits = 2
 )
-
 print(res)
 ```
 
@@ -268,7 +272,7 @@ Monte Carlo simulation may increase runtime. You can disable them when
 needed:
 
 ``` r
-res <- gobayes_bayesian_go_nogo_oc(
+res <- gobayes_oc(
   n_total = 200,
   control_rates = 0.30,
   treatment_rates = seq(0.30, 0.60, by = 0.05),
@@ -439,7 +443,7 @@ print(res, digits = 2)
 You can also set `digits` when calling the analysis function:
 
 ``` r
-res <- gobayes_bayesian_go_nogo_oc(
+res <- gobayes_oc(
   n_total = 100,
   control_rates = 0.30,
   treatment_rates = c(0.30, 0.35, 0.40),
@@ -454,10 +458,11 @@ A typical workflow is:
 ``` r
 library(GoBayes)
 
-gobayes_set_server("http://127.0.0.1:8000", timeout = 300)
+gobayes_set_server("http://116.62.190.134:10002")
+gobayes_set_api_token("Contact the author to get API token")
 gobayes_health_check()
 
-res <- gobayes_bayesian_go_nogo_oc(
+res <- gobayes_oc(
   n_total = 100,
   alloc_ratio = c(1, 1),
   go_delta = 0.05,
@@ -511,13 +516,7 @@ a sufficiently large `n_sim`, depending on the precision required.
 If you see an error indicating that the server is not configured, call:
 
 ``` r
-gobayes_set_server("http://127.0.0.1:8000")
-```
-
-or set:
-
-``` r
-Sys.setenv(GOBAYES_SERVER_URL = "http://127.0.0.1:8000")
+gobayes_set_server("Contact the author to get server address")
 ```
 
 ### Cannot Reach Server
@@ -541,13 +540,7 @@ verify that:
 If the server requires a bearer token, configure it with:
 
 ``` r
-gobayes_set_api_token("your-token")
-```
-
-or set:
-
-``` r
-Sys.setenv(GOBAYES_API_TOKEN = "your-token")
+gobayes_set_api_token("Contact the author to get API token")
 ```
 
 ### Request Timeout
@@ -555,7 +548,7 @@ Sys.setenv(GOBAYES_API_TOKEN = "your-token")
 For long-running analyses, increase the timeout:
 
 ``` r
-gobayes_set_server("http://127.0.0.1:8000", timeout = 600)
+gobayes_set_server("http://116.62.190.134:10002", timeout = 600)
 ```
 
 You can also reduce runtime by setting:
@@ -583,7 +576,7 @@ server. Common issues include:
 For reproducible Monte Carlo results, set `mc_seed` explicitly:
 
 ``` r
-res <- gobayes_bayesian_go_nogo_oc(
+res <- gobayes_oc(
   n_total = 100,
   control_rates = 0.30,
   treatment_rates = c(0.30, 0.35, 0.40),
